@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -17,6 +18,7 @@ const (
 type Tracker struct {
 	client *http.Client
 	list   map[string]*BugDevel
+	lock   *sync.Mutex
 }
 
 func NewTracker() *Tracker {
@@ -25,14 +27,16 @@ func NewTracker() *Tracker {
 
 	t.client = &http.Client{}
 	t.list = make(map[string]*BugDevel)
+	t.lock = &sync.Mutex{}
 
 	return t
 }
 
+// Add a bug to be tracked and store its BugDevel response object
 func (t *Tracker) Add(args []string) {
 	if len(args) < 1 {
-		log.Error(fmt.Sprintf("Usage: add <bug #>",
-			strings.Join(args, " ")))
+		log.Error("Empty arg list for Add()")
+		fmt.Println("Usage: add <bug #>")
 		return
 	}
 
@@ -47,31 +51,35 @@ func (t *Tracker) Add(args []string) {
 
 		var obj BugDevel
 		json.Unmarshal(bodyBytes, &obj)
-		log.Info(fmt.Sprintf("Found: %s", obj.Title))
+		log.Debug(fmt.Sprintf("Found: %s", obj.Title))
 
 		log.Info(fmt.Sprintf("added: %s", bug))
 		t.list[bug] = &obj
 		t.Save()
 	} else {
 		log.Error("GET error: ", err)
+		fmt.Println("Error: There was a problem adding that bug.")
 	}
 }
 
+// Drop a bug from the tracker
 func (t *Tracker) Drop(args []string) {
 	if len(args) < 1 {
-		log.Error(fmt.Sprintf("Usage: drop <bug #>",
-			strings.Join(args, " ")))
+		log.Error("Empty arg list for Drop()")
+		fmt.Println("Usage: drop <bug #>")
 		return
 	}
 	if _, ok := t.list[args[0]]; ok {
-		log.Debug(fmt.Sprintf("drop: %s :: %s", args[0]))
+		log.Info(fmt.Sprintf("dropped: %s :: %s", args[0]))
 		delete(t.list, args[0])
 		t.Save()
 	} else {
-		log.Error(fmt.Sprintf("Cannot drop: %s \nDoes not exist!", args[0]))
+		log.Error(fmt.Sprintf("Cannot drop: %s \nHas not been added!", args[0]))
+		fmt.Println("Error: That bug has not been added")
 	}
 }
 
+// Load save file into in-memory map
 func (t *Tracker) Read() {
 	bytes, err := ioutil.ReadFile(saveFileName)
 
@@ -93,6 +101,7 @@ func (t *Tracker) Read() {
 	t.list = obj
 }
 
+// Save off contents of map to a file
 func (t *Tracker) Save() {
 	out, err := json.Marshal(t.list)
 	if err != nil {
