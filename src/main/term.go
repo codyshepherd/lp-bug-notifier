@@ -23,11 +23,14 @@ var ops = map[string]func(*Tracker, []string){
 		t.Drop(args)
 	},
 	"ls": func(t *Tracker, args []string) {
-		for k := range t.list {
-			fmt.Print(k)
+		for k, v := range t.list {
+			fmt.Println(fmt.Sprintf("%s: %s", k, v.Title))
 		}
 	},
 	"quit": func(t *Tracker, args []string) {
+		fmt.Println("quitting...")
+	},
+	"exit": func(t *Tracker, args []string) {
 		fmt.Println("quitting...")
 	},
 }

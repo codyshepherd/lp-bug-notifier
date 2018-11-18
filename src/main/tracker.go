@@ -12,7 +12,7 @@ import (
 
 type Tracker struct {
 	client *http.Client
-	list   map[string]string
+	list   map[string]*BugDevel
 }
 
 func NewTracker() *Tracker {
@@ -20,7 +20,7 @@ func NewTracker() *Tracker {
 	var t *Tracker = new(Tracker)
 
 	t.client = &http.Client{}
-	t.list = make(map[string]string)
+	t.list = make(map[string]*BugDevel)
 
 	return t
 }
@@ -35,28 +35,18 @@ func (t *Tracker) Add(args []string) {
 	bug := strings.TrimRight(args[0], " \n")
 
 	req, _ := http.NewRequest("GET",
-		"https://api.launchpad.net/devel/bugs", nil)
-	q := req.URL.Query()
-	q.Add("ws.op", "getBugData")
-	q.Add("bug_id", bug)
-	req.URL.RawQuery = q.Encode()
-	//req.Header.Set("bug_id", bug)
+		"https://api.launchpad.net/devel/bugs/"+bug, nil)
 	resp, err := t.client.Do(req)
 
-	log.Info("resp content length: ", resp.ContentLength)
-
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-
-	var obj []BugDevel
-
-	json.Unmarshal(bodyBytes, &obj)
-
-	log.Info("len obj: ", len(obj))
-	log.Info(obj[0].title)
-
 	if err == nil {
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+
+		var obj BugDevel
+		json.Unmarshal(bodyBytes, &obj)
+		log.Info(fmt.Sprintf("Found: %s", obj.Title))
+
 		log.Info(fmt.Sprintf("added: %s", bug))
-		t.list[bug] = "info here"
+		t.list[bug] = &obj
 	} else {
 		log.Error("GET error: ", err)
 	}
