@@ -10,7 +10,8 @@ That's it.
 
 ## Install and Run Instructions
 
-Assuming your $GOPATH and $PATH are configured correctly (I recommend direnv),
+Assuming your $GOPATH and $PATH are configured correctly (a la direnv), from top level in the project
+(i.e. `ls` reveals `src/` and `README.md`):
 
 `go run main`
 
