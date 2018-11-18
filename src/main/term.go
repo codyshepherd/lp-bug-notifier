@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -12,6 +15,26 @@ type Term struct {
 	recv    chan string
 	reader  *bufio.Reader
 	tracker *Tracker
+}
+
+type byTime []string
+
+func (s byTime) Len() int {
+	return len(s)
+}
+func (s byTime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s byTime) Less(i, j int) bool {
+	r := regexp.MustCompile(`\[[0-9]*`)
+	string_i := strings.Trim(r.FindString(s[i]), "[")
+	string_j := strings.Trim(r.FindString(s[j]), "[")
+	int_i, erri := strconv.Atoi(string_i)
+	int_j, errj := strconv.Atoi(string_j)
+	if erri != nil || errj != nil {
+		panic("Problem with converting string to int")
+	}
+	return int_i < int_j
 }
 
 var ops = map[string]func(*Tracker, []string){
@@ -26,19 +49,24 @@ var ops = map[string]func(*Tracker, []string){
 		t.lock.Unlock()
 	},
 	"ls": func(t *Tracker, args []string) {
-		fmt.Println()
+		buffer := []string{}
 		t.lock.Lock()
 		for k, v := range t.list {
 			tm, err := time.Parse(time.RFC3339, v.Date_last_message)
 
 			if err != nil {
-				fmt.Println(fmt.Sprintf("%s: %s", k, v.Title))
+				buffer = append(buffer, fmt.Sprintf("%s: %s", k, v.Title))
 			} else {
-				fmt.Println(fmt.Sprintf("%s [%s]: %s", k,
+				buffer = append(buffer, fmt.Sprintf("%s [%s]: %s", k,
 					time.Since(tm).Truncate(time.Minute).String(), v.Title))
 			}
 		}
 		t.lock.Unlock()
+		fmt.Println()
+		sort.Sort(byTime(buffer))
+		for i := range buffer {
+			fmt.Println(buffer[i])
+		}
 		fmt.Println()
 	},
 	"refresh": func(t *Tracker, args []string) {
