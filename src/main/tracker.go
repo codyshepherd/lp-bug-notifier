@@ -10,6 +10,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	saveFileName = ".bugsave"
+)
+
 type Tracker struct {
 	client *http.Client
 	list   map[string]*BugDevel
@@ -47,6 +51,7 @@ func (t *Tracker) Add(args []string) {
 
 		log.Info(fmt.Sprintf("added: %s", bug))
 		t.list[bug] = &obj
+		t.Save()
 	} else {
 		log.Error("GET error: ", err)
 	}
@@ -61,7 +66,39 @@ func (t *Tracker) Drop(args []string) {
 	if _, ok := t.list[args[0]]; ok {
 		log.Debug(fmt.Sprintf("drop: %s :: %s", args[0]))
 		delete(t.list, args[0])
+		t.Save()
 	} else {
 		log.Error(fmt.Sprintf("Cannot drop: %s \nDoes not exist!", args[0]))
 	}
+}
+
+func (t *Tracker) Read() {
+	bytes, err := ioutil.ReadFile(saveFileName)
+
+	if err != nil {
+		log.Error("Problem reading save file")
+		log.Error(err)
+		return
+	}
+
+	var obj map[string]*BugDevel
+	err = json.Unmarshal(bytes, &obj)
+
+	if err != nil {
+		log.Error("Problem unmarshalling savefile data.")
+		log.Error(err)
+		return
+	}
+
+	t.list = obj
+}
+
+func (t *Tracker) Save() {
+	out, err := json.Marshal(t.list)
+	if err != nil {
+		log.Error("Failed to marshal.")
+		return
+	}
+
+	ioutil.WriteFile(saveFileName, out, 0644)
 }
