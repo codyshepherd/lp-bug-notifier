@@ -17,7 +17,7 @@ const (
 
 type Tracker struct {
 	client *http.Client
-	list   map[string]*BugDevel
+	list   map[string]*Bug
 	lock   *sync.Mutex
 }
 
@@ -26,7 +26,7 @@ func NewTracker() *Tracker {
 	var t *Tracker = new(Tracker)
 
 	t.client = &http.Client{}
-	t.list = make(map[string]*BugDevel)
+	t.list = make(map[string]*Bug)
 	t.lock = &sync.Mutex{}
 
 	return t
@@ -49,12 +49,21 @@ func (t *Tracker) Add(args []string) {
 	if err == nil {
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
 
-		var obj BugDevel
-		json.Unmarshal(bodyBytes, &obj)
-		log.Debug(fmt.Sprintf("Found: %s", obj.Title))
+        obj := NewBug()
+		json.Unmarshal(bodyBytes, obj.BugStruct)
+		log.Debug(fmt.Sprintf("Found: %s", obj.BugStruct.Title))
 
+        // Check for time difference
+        if b, ok := t.list[bug]; ok {
+            if b.LastChecked != obj.BugStruct.Date_last_message {
+                b.Changed = true
+                b.LastChecked = obj.BugStruct.Date_last_message
+            }
+        } else {
+            obj.Changed = true
+        }
 		log.Info(fmt.Sprintf("added: %s", bug))
-		t.list[bug] = &obj
+		t.list[bug] = obj
 		t.Save()
 	} else {
 		log.Error("GET error: ", err)
@@ -89,7 +98,7 @@ func (t *Tracker) Read() {
 		return
 	}
 
-	var obj map[string]*BugDevel
+	var obj map[string]*Bug
 	err = json.Unmarshal(bytes, &obj)
 
 	if err != nil {

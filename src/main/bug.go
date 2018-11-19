@@ -1,5 +1,11 @@
 package main
 
+type Bug struct {
+    BugStruct *BugDevel
+    LastChecked string
+    Changed bool
+}
+
 type BugDevel struct {
 	Activity_collection_link                  string
 	Attachments_collection_link               string
@@ -42,3 +48,12 @@ type BugDevel struct {
 	Web_link                                  string
 	Who_made_private_link                     string
 }
+
+func NewBug() *Bug {
+    var b *Bug = new(Bug)
+    b.BugStruct = &BugDevel{}
+    b.LastChecked = ""
+    b.Changed = false
+    return b
+}
+

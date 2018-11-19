@@ -11,14 +11,9 @@ import (
 	"time"
 )
 
-type Term struct {
-	recv    chan string
-	reader  *bufio.Reader
-	tracker *Tracker
-}
-
+//////////////////////////////////////////////////////////////////////////////
+// byTime allows us to sort strings by regex
 type byTime []string
-
 func (s byTime) Len() int {
 	return len(s)
 }
@@ -36,7 +31,9 @@ func (s byTime) Less(i, j int) bool {
 	}
 	return int_i < int_j
 }
+//////////////////////////////////////////////////////////////////////////////
 
+// ops defines the behavior of available terminal commands
 var ops = map[string]func(*Tracker, []string){
 	"add": func(t *Tracker, args []string) {
 		t.lock.Lock()
@@ -52,21 +49,36 @@ var ops = map[string]func(*Tracker, []string){
 		buffer := []string{}
 		t.lock.Lock()
 		for k, v := range t.list {
-			tm, err := time.Parse(time.RFC3339, v.Date_last_message)
+			tm, err := time.Parse(time.RFC3339, v.BugStruct.Date_last_message)
 
+            // check for updated-ness and prepend string if appropriate
+            // note that once "Updated!" is displayed, the Changed flag on the
+            // bug will be turned off
+            updated := ""
+            if v.Changed {
+                updated = "**Updated!** "
+                v.Changed = false
+            }
+
+            // check for time conversion failure
 			if err != nil {
-				buffer = append(buffer, fmt.Sprintf("%s: %s", k, v.Title))
+				buffer = append(buffer, fmt.Sprintf("%s%s: %s", updated, k,
+                v.BugStruct.Title))
 			} else {
-				buffer = append(buffer, fmt.Sprintf("%s [%s]: %s", k,
-					time.Since(tm).Truncate(time.Minute).String(), v.Title))
+				buffer = append(buffer, fmt.Sprintf("%s%s [%s]: %s", updated,
+                k, time.Since(tm).Truncate(time.Minute).String(), v.BugStruct.Title))
 			}
 		}
 		t.lock.Unlock()
+
 		fmt.Println()
+
+        // sort ascending by time since last update
 		sort.Sort(byTime(buffer))
 		for i := range buffer {
 			fmt.Println(buffer[i])
 		}
+
 		fmt.Println()
 	},
 	"refresh": func(t *Tracker, args []string) {
@@ -84,6 +96,14 @@ var ops = map[string]func(*Tracker, []string){
 	},
 }
 
+// Term handles input from user and display
+type Term struct {
+	recv    chan string
+	reader  *bufio.Reader
+	tracker *Tracker
+}
+
+// initializes a new Term object
 func NewTerm() *Term {
 	var t *Term = new(Term)
 	t.recv = make(chan string, 1024)     // maybe i'll add more channels eventually
@@ -93,6 +113,7 @@ func NewTerm() *Term {
 	return t
 }
 
+// The runtime loop for the terminal
 func (t *Term) Run() {
 	go t.handle()      // spin off serialized command handler
 	go t.checkUpdate() // spin off periodic updater
