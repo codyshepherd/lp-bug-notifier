@@ -10,8 +10,22 @@ That's it.
 
 ## Install and Run Instructions
 
-Assuming your $GOPATH and $PATH are configured correctly (a la direnv), from top level in the project
-(i.e. `ls` reveals `src/` and `README.md`):
+### Install direnv
+
+1. `$ sudo apt install direnv`
+2. add the following line to your .bashrc:
+    `eval "$(direnv hook bash)"`
+3. `cd` to project directory
+4. `$ echo 'layout go' > .envrc`
+    This should prompt the following message:
+    > direnv: error .envrc is blocked. Run `direnv allow` to approve its content.
+5. `direnv allow`
+
+### Install project & dependencies
+
+`go get main`
+
+### Run
 
 `go run main`
 
