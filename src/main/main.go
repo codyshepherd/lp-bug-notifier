@@ -18,6 +18,9 @@ func main() {
 	log.SetLevel(log.DebugLevel)
 	log.Info("LP Bug Notifier started")
 
-	var term *Term = NewTerm()
-	term.Run()
+	// var term *Term = NewTerm()
+	// term.Run()
+
+	var ui *Ui = NewUi()
+	ui.Run()
 }
