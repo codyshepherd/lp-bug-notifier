@@ -33,14 +33,14 @@ func NewTracker() *Tracker {
 }
 
 // Add a bug to be tracked and store its BugDevel response object
-func (t *Tracker) Add(args []string) {
-	if len(args) < 1 {
-		log.Error("Empty arg list for Add()")
-		fmt.Println("Usage: add <bug #>")
+func (t *Tracker) Add(arg string) {
+	if len(arg) < 1 {
+		log.Error("Null string arg for Add()")
+		//fmt.Println("Usage: add <bug #>")
 		return
 	}
 
-	bug := strings.TrimRight(args[0], " \n")
+	bug := strings.TrimRight(arg, " \n")
 
 	req, _ := http.NewRequest("GET",
 		"https://api.launchpad.net/devel/bugs/"+bug, nil)
@@ -49,25 +49,25 @@ func (t *Tracker) Add(args []string) {
 	if err == nil {
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
 
-        obj := NewBug()
+		obj := NewBug()
 		json.Unmarshal(bodyBytes, obj.BugStruct)
 		log.Debug(fmt.Sprintf("Found: %s", obj.BugStruct.Title))
 
-        // Check for time difference
-        if b, ok := t.list[bug]; ok {
-            if b.LastChecked != obj.BugStruct.Date_last_message {
-                b.Changed = true
-                b.LastChecked = obj.BugStruct.Date_last_message
-            }
-        } else {
-            obj.Changed = true
-        }
+		// Check for time difference
+		if b, ok := t.list[bug]; ok {
+			if b.LastChecked != obj.BugStruct.Date_last_message {
+				b.Changed = true
+				b.LastChecked = obj.BugStruct.Date_last_message
+			}
+		} else {
+			obj.Changed = true
+		}
 		log.Info(fmt.Sprintf("added: %s", bug))
 		t.list[bug] = obj
 		t.Save()
 	} else {
 		log.Error("GET error: ", err)
-		fmt.Println("Error: There was a problem adding that bug.")
+		//fmt.Println("Error: There was a problem adding that bug.")
 	}
 }
 
@@ -75,7 +75,7 @@ func (t *Tracker) Add(args []string) {
 func (t *Tracker) Drop(args []string) {
 	if len(args) < 1 {
 		log.Error("Empty arg list for Drop()")
-		fmt.Println("Usage: drop <bug #>")
+		//fmt.Println("Usage: drop <bug #>")
 		return
 	}
 	if _, ok := t.list[args[0]]; ok {
@@ -84,7 +84,7 @@ func (t *Tracker) Drop(args []string) {
 		t.Save()
 	} else {
 		log.Error(fmt.Sprintf("Cannot drop: %s \nHas not been added!", args[0]))
-		fmt.Println("Error: That bug has not been added")
+		//fmt.Println("Error: That bug has not been added")
 	}
 }
 

@@ -27,16 +27,16 @@ func main() {
 
 	g.Cursor = true
 
-	u := NewUi()
-	tb := NewTextBar()
+	s := NewSide()
+	tb := NewAddTextBar()
 
-	g.SetManager(tb, u)
+	g.SetManager(tb, s)
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlA, gocui.ModNone, tb.Edit); err != nil {
 		log.Panic(err)
 	}
 
-	if err := g.SetKeybinding("", gocui.KeyCtrlQ, gocui.ModNone, fgUi); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyEnter, gocui.ModNone, s.FgSide); err != nil {
 		log.Panic(err)
 	}
 
@@ -53,23 +53,46 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
 }
 
-func fgUi(g *gocui.Gui, v *gocui.View) error {
+func fgSide(g *gocui.Gui, v *gocui.View) error {
 	g.SetCurrentView("side")
 	return nil
 }
 
-func fgTextBar(g *gocui.Gui, v *gocui.View) error {
-	g.SetCurrentView("TextBar")
+func fgAddTextBar(g *gocui.Gui, v *gocui.View) error {
+	g.SetCurrentView("AddTextBar")
 	return nil
 }
 
+func simpleEditor(v *gocui.View, key gocui.Key, ch rune, mod gocui.Modifier) {
+	switch {
+	case ch != 0 && mod == 0:
+		v.EditWrite(ch)
+	case key == gocui.KeySpace:
+		v.EditWrite(' ')
+	case key == gocui.KeyBackspace || key == gocui.KeyBackspace2:
+		v.EditDelete(true)
+	case key == gocui.KeyDelete:
+		v.EditDelete(false)
+	case key == gocui.KeyInsert:
+		v.Overwrite = !v.Overwrite
+	case key == gocui.KeyArrowLeft:
+		v.MoveCursor(-1, 0, false)
+	case key == gocui.KeyArrowRight:
+		ox, _ := v.Origin()
+		cx, _ := v.Cursor()
+		if cx+1 < ox+100 {
+			v.MoveCursor(1, 0, false)
+		}
+	}
+}
+
 func cursor_keybindings(g *gocui.Gui, v *gocui.View) {
-	if err := g.SetKeybinding("TextBar", gocui.KeyArrowLeft, gocui.ModNone,
+	if err := g.SetKeybinding("AddTextBar", gocui.KeyArrowLeft, gocui.ModNone,
 		cursorLeft); err != nil {
 		log.Panic(err)
 	}
 
-	if err := g.SetKeybinding("TextBar", gocui.KeyArrowRight, gocui.ModNone,
+	if err := g.SetKeybinding("AddTextBar", gocui.KeyArrowRight, gocui.ModNone,
 		cursorRight); err != nil {
 		log.Panic(err)
 	}

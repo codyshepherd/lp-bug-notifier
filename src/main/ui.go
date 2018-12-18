@@ -2,144 +2,166 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jroimartin/gocui"
-	//log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
-type Ui struct {
-	// gui     *gocui.Gui
+type Side struct {
 	tracker *Tracker
 }
 
-func NewUi() *Ui {
-	u := new(Ui)
-	u.tracker = NewTracker()
-	u.tracker.Read()
-	/*
-		var err error
-		u.gui, err = gocui.NewGui(gocui.OutputNormal)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		u.gui.SetManagerFunc(u.MkLayout())
-
-		if err := u.gui.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-			log.Panic(err)
-		}
-	*/
-	return u
+func NewSide() *Side {
+	s := new(Side)
+	s.tracker = NewTracker()
+	s.tracker.Read()
+	return s
 }
 
-/*
-// "curried" function for passing term contents into layout
-func (u *Ui) MkLayout() func(*gocui.Gui) error {
-	return func(g *gocui.Gui) error {
-		_, maxY := g.Size()
-		if v, err := g.SetView("side", -1, -1, 30, maxY); err != nil {
-			if err != gocui.ErrUnknownView {
-				return err
-			}
-			v.Highlight = true
-			v.SelBgColor = gocui.ColorGreen
-			v.SelFgColor = gocui.ColorBlack
-			var noargs []string
-			bugs := list_bugs(u.tracker, noargs)
-
-			for _, line := range bugs {
-				fmt.Fprintln(v, line)
-			}
-		}
-		return nil
-	}
-}
-*/
-
-func (u *Ui) Layout(g *gocui.Gui) error {
-	_, maxY := g.Size()
-	if v, err := g.SetView("side", -1, -1, 30, maxY); err != nil {
+func (s *Side) Layout(g *gocui.Gui) error {
+	maxX, maxY := g.Size()
+	if v, err := g.SetView("side", -1, -1, maxX/3, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorGreen
 		v.SelFgColor = gocui.ColorBlack
+
 		var noargs []string
-		bugs := list_bugs(u.tracker, noargs)
+		bugs := list_bugs(s.tracker, noargs)
 
 		for _, line := range bugs {
 			fmt.Fprintln(v, line)
 		}
 	}
 	return nil
-
 }
 
-type TextBar struct {
-	buffer []string
+func (s *Side) FgSide(g *gocui.Gui, v *gocui.View) error {
+	vs := g.Views()
+	for _, view := range vs {
+		if view.Name() == "AddTextBar" {
+			contents := strings.Split(view.Buffer(), " ")
+			view.Clear()
+
+			for _, item := range contents {
+				if _, ok := s.tracker.list[item]; !ok {
+					s.tracker.Add(item)
+				}
+			}
+		}
+	}
+
+	nv, err := g.SetCurrentView("side")
+	nv.Clear()
+
+	var noargs []string
+	bugs := list_bugs(s.tracker, noargs)
+
+	for _, line := range bugs {
+		fmt.Fprintln(nv, line)
+	}
+
+	return err
 }
 
-func NewTextBar() *TextBar {
-	tb := new(TextBar)
+type AddTextBar struct {
+	buffer string
+}
+
+func NewAddTextBar() *AddTextBar {
+	tb := new(AddTextBar)
 	return tb
 }
 
-func (tb *TextBar) Layout(g *gocui.Gui) error {
+func (tb *AddTextBar) Layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
-	v, err := g.SetView("TextBar", maxX/2-7, maxY/2, maxX/2+7, maxY/2+2)
+	v, err := g.SetView("AddTextBar", maxX/2-10, maxY/2, maxX/2+10, maxY/2+2)
 	if err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(v, "Input Bug")
-		cursor_keybindings(g, v)
+		fmt.Fprintln(v, "")
+		v.Editable = true
 	}
 	return nil
 }
 
-func (tb *TextBar) Edit(g *gocui.Gui, v *gocui.View) error {
-	_, err := g.SetCurrentView("TextBar")
+func (tb *AddTextBar) Edit(g *gocui.Gui, v *gocui.View) error {
+	nv, err := g.SetCurrentView("AddTextBar")
+	nv.SetCursor(0, 0)
 	if err != nil {
 		return err
 	}
 
+	nv.Editor = gocui.EditorFunc(simpleEditor)
 	return nil
-}
-
-func add_bug(t *Tracker, args []string) {
-
 }
 
 func list_bugs(t *Tracker, args []string) []string {
 	buffer := []string{}
 	t.lock.Lock()
 	for k, v := range t.list {
-		tm, err := time.Parse(time.RFC3339, v.BugStruct.Date_last_message)
+		tm, _ := time.Parse(time.RFC3339, v.BugStruct.Date_last_message)
 
 		// check for updated-ness and prepend string if appropriate
 		// note that once "Updated!" is displayed, the Changed flag on the
 		// bug will be turned off
-		updated := ""
-		if v.Changed {
-			updated = "**Updated!** "
-			v.Changed = false
-		}
 
-		// check for time conversion failure
-		if err != nil {
-			buffer = append(buffer, fmt.Sprintf("%s%s: %s", updated, k,
-				v.BugStruct.Title))
-		} else {
-			buffer = append(buffer, fmt.Sprintf("%s%s [%s]: %s", updated,
-				k, time.Since(tm).Truncate(time.Minute).String(), v.BugStruct.Title))
-		}
+		log.Debug("k: " + k)
+		log.Debug("v: " + v.BugStruct.Title)
+		buffer = append(buffer, fmt.Sprintf("%s [%s]: %s", k,
+			time.Since(tm).Truncate(time.Minute).String(), v.BugStruct.Title))
 	}
 	t.lock.Unlock()
 
 	// sort ascending by time since last update
 	sort.Sort(byTime(buffer))
-	return buffer
+
+	newbuffer := []string{}
+	for _, item := range buffer {
+		k := strings.TrimRight(item, " ")
+		if v, ok := t.list[k]; ok {
+			updated := ""
+			if v.Changed {
+				updated = "**Updated!** "
+				v.Changed = false
+			}
+			newbuffer = append(newbuffer, updated+item)
+		} else {
+			newbuffer = append(newbuffer, item)
+		}
+
+	}
+
+	return newbuffer
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// byTime allows us to sort strings by regex
+type byTime []string
+
+func (s byTime) Len() int {
+	return len(s)
+}
+func (s byTime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s byTime) Less(i, j int) bool {
+	log.Debug(s)
+	r := regexp.MustCompile(`\[[0-9]*`)
+	string_i := strings.Trim(r.FindString(s[i]), "[")
+	string_j := strings.Trim(r.FindString(s[j]), "[")
+	int_i, erri := strconv.Atoi(string_i)
+	int_j, errj := strconv.Atoi(string_j)
+	if erri != nil || errj != nil {
+		log.Panic("Problem with converting string to int")
+	}
+	return int_i < int_j
 }
